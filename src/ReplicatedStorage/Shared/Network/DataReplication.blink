@@ -1,0 +1,27 @@
+-- File: src/ReplicatedStorage/Shared/Network/DataReplication.blink
+
+-- Đường dẫn xuất file tự động cho Client (UI, Cảm biến, Vẽ đồ họa)
+option ClientOutput = "D:\Project W\src\ReplicatedStorage\Shared\Network\DataReplicationClient.luau"
+
+-- Đường dẫn xuất file tự động cho Server (Bảo mật, Tính toán, Lưu Data)
+option ServerOutput = "D:\Project W\src\ReplicatedStorage\Shared\Network\DataReplicationServer.luau"
+
+-- Khai báo các loại tiền tệ để tối ưu bytes
+enum CurrencyType = {
+    Coin,
+    Gem
+}
+
+-- Tách struct ra ngoài để tái sử dụng
+struct CurrencyPayload {
+    Currency: CurrencyType,
+    NewAmount: u32 
+}
+
+-- Sự kiện cập nhật tiền (Server gửi cho Client)
+event UpdateCurrency {
+    from: Server,
+    type: Reliable,
+    call: SingleAsync,
+    data: CurrencyPayload
+}

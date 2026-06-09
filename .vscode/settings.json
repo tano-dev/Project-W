@@ -1,0 +1,8 @@
+{
+    "robloxLsp.diagnostics.disable": [
+        1000,
+        1000,
+        1000,
+        1000
+    ]
+}
