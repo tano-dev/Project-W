@@ -4,19 +4,19 @@
 local ItemDatabase = require(game.ReplicatedStorage.Shared.Constants.ItemData)
 
 export type StackableData = {
-    Id: string,     -- ID gốc (VD: "HealthPotion", "IronOre")
+    Id: string,     -- Id gốc (VD: "HealthPotion", "IronOre")
     Amount: number,         -- Số lượng
     NBT: {[string]: any}?   -- Dành cho trường hợp đặc biệt (ví dụ: bình máu có hạn sử dụng)
 }
 
 local StackableFactory = {}
 
--- [MỚI] Thêm dấu "?" vào `StackableData?` vì hàm này có thể trả về nil nếu ID sai
+-- [MỚI] Thêm dấu "?" vào `StackableData?` vì hàm này có thể trả về nil nếu Id sai
 function StackableFactory.create(Id: string, amount: number): StackableData?
     
-    -- 1. KIỂM TRA TÍNH HỢP LỆ CỦA ID TỪ DATABASE
+    -- 1. KIỂM TRA TÍNH HỢP LỆ CỦA Id TỪ DATABASE
     if not ItemDatabase.Registry[Id] then
-        warn("🚨 [StackableFactory] Từ chối tạo đồ! ID không tồn tại trong GlobalRegistry: " .. tostring(Id))
+        warn("🚨 [StackableFactory] Từ chối tạo đồ! Id không tồn tại trong GlobalRegistry: " .. tostring(Id))
         return nil
     end
 

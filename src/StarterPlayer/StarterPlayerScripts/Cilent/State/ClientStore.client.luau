@@ -30,7 +30,7 @@ Replica.OnNew("PlayerData", function(replica)
                 if path[1] == "Inventories" and path[2] == "Items" then
                     local inserted_item = param1
                     local inserted_index = param2
-                    print("⚔️ Nhặt được đồ mới tại ô slot [" .. inserted_index .. "]: " .. inserted_item.ID)
+                    print("⚔️ Nhặt được đồ mới tại ô slot [" .. inserted_index .. "]: " .. inserted_item.Id)
                     
                     -- [GẮN CODE UI Ở ĐÂY]
                 end
@@ -40,7 +40,7 @@ Replica.OnNew("PlayerData", function(replica)
                 if path[1] == "Inventories" and path[2] == "Items" then
                     local removed_item = param1
                     local removed_index = param2
-                    print("🗑️ Đã xóa đồ tại ô [" .. removed_index .. "]: " .. removed_item.ID)
+                    print("🗑️ Đã xóa đồ tại ô [" .. removed_index .. "]: " .. removed_item.Id)
                 end
             end
             

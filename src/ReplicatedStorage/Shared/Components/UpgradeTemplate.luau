@@ -6,107 +6,125 @@
 -- tỉ lệ sẽ tăng/giảm tùy thuộc vào tình trạng hiện tại của món vũ khí.
 -- ==========================================
 export type UpgradeCondition = {
-    Type: string,           -- [Sửa nhẹ từ StatName thành Type để bao quát hơn] 
-                            -- Các loại: "Purity", "Corruption", "Rarity", "OnLessUpgradeAttempts", "NotUpgraded"...
+    Type: string,           -- Tên chỉ số/Trạng thái dùng để kiểm tra.
+                            -- Các loại hợp lệ: "Purity", "Corruption", "Rarity", 
+                            -- "OnLessUpgradeAttempts", "OnMoreUpgradeAttempts", "NotUpgraded"
                             
-    RatePerPoint: number?,  -- Mức độ thay đổi tỉ lệ trên mỗi điểm của chỉ số. 
+    RatePerPoint: number?,  -- Mức độ thay đổi tỉ lệ trên mỗi điểm của chỉ số (Dùng cho Type là Purity/Corruption/Rarity).
                             -- VD: 0.05 (Tăng 5% cho mỗi 1 điểm Purity) hoặc -0.1 (Giảm 10% cho mỗi 1 điểm Rarity).
                             
-    MaxCap: number?,        -- Giới hạn tối đa/tối thiểu của mức thay đổi này để tránh việc tỉ lệ lên quá 100% hoặc xuống âm.
-                            -- VD: 0.3 (Chỉ cho phép tăng tối đa 30% dù Purity có cao đến mấy).
+    MaxCap: number?,        -- Giới hạn tối đa/tối thiểu của mức thay đổi này để tránh việc tỉ lệ lệch quá xa.
+                            -- VD: 0.3 (Chỉ cho phép tăng tối đa 30% dù chỉ số gốc có cao đến mấy).
                             
-    TargetValue: number?,   -- [Bổ sung] Dành cho các điều kiện so sánh. VD: OnLessUpgradeAttempts thì TargetValue = 3 (Dưới 3 lần ép).
-    BonusRate: number?,     -- [Bổ sung] Lượng tỉ lệ thưởng cứng nếu đạt điều kiện. VD: NotUpgraded thưởng hẳn 0.2 (20%).
+    TargetValue: number?,   -- Dành cho các điều kiện so sánh. 
+                            -- VD: Nếu Type = "OnLessUpgradeAttempts" thì TargetValue = 3 (Chỉ áp dụng khi đồ đập dưới 3 lần).
+    
+    BonusRate: number?,     -- Lượng tỉ lệ thưởng/phạt CỨNG nếu đạt điều kiện so sánh. 
+                            -- VD: Đạt điều kiện "NotUpgraded" -> Thưởng thẳng 0.2 (20%).
 }
 
 -- ==========================================
 -- 2. VÒNG QUAY CHỈ SỐ (STAT ROLL)
--- Khi kịch bản ép đồ đã được chốt, hệ thống sẽ vào đây để quay xem
--- món đồ được cộng thêm chính xác bao nhiêu điểm sát thương/phòng thủ.
+-- Khối định nghĩa một dòng chỉ số có thể rớt ra khi nâng cấp.
 -- ==========================================
 export type StatRollEntry = {
-    StatName: string,       -- Tên chỉ số sẽ được cộng/trừ. VD: "Damage", "TrueDamage", ...
+    StatName: string,       -- Tên chỉ số sẽ được cộng/trừ. 
+                            -- VD: "Damage", "MagicDamage", "CritRate", "Purity", "Corruption".
     
     Min: number,            -- Mức cộng tối thiểu. VD: 5
     Max: number,            -- Mức cộng tối đa. VD: 15 (Hệ thống sẽ random từ 5 đến 15).
     
-    LevelScale: {           -- (Tùy chọn) Dành cho việc chỉ số tăng mạnh hơn dựa trên cấp độ của vũ khí hoặc người chơi.
+    LevelScale: {           -- (Tùy chọn) Tính năng scale chỉ số dựa trên cấp độ của vũ khí.
         Min: number, 
         Max: number
     }?, 
     
-    Weight: number,         -- Trọng số của dòng chỉ số này. 
-                            -- VD: Dòng "Damage" có Weight 100, dòng "CritRate" có Weight 10 -> Cực kỳ khó ra CritRate.
+    Weight: number,         -- Trọng số quay Gacha. 
+                            -- [QUAN TRỌNG]: Nếu Weight = 0 -> Chỉ số này BẮT BUỘC rớt (100% trúng) mà không tiêu tốn lượt Roll.
+                            -- Nếu Weight > 0 -> Sẽ vào chung một rổ (Pool) để quay xí ngầu cạnh tranh với các dòng khác.
 }
 
 -- ==========================================
 -- 3. KỊCH BẢN KẾT QUẢ (POOL OUTCOME)
--- Đại diện cho một "tương lai" có thể xảy ra khi đập viên đá này vào vũ khí.
+-- Đại diện cho một "tương lai" có thể xảy ra khi đập viên đá này.
 -- ==========================================
 export type PoolOutcome = {
-    Weight: number,                  -- Tỉ lệ ra kịch bản này so với các kịch bản khác cùng Pool.
-                                     -- VD: Kịch bản "Tăng siêu mạnh" Weight=10, kịch bản "Tăng cùi" Weight=90.
-    Rolls: number?,                    -- Số lần roll chỉ số trong StatPools. (0 = all, 1 = roll 1 lần, 2 = roll 2 lần, ...)
-                                        -- VD: Rolls=2 nghĩa là sẽ roll 2 dòng chỉ số nếu trúng kịch bản này.
-    -- [PHẦN THƯỞNG / HÌNH PHẠT VỀ CHỈ SỐ]
-    StatPools: {StatRollEntry}?,     -- Nếu kịch bản này trúng, hệ thống sẽ tiếp tục roll các dòng chỉ số trong này để cộng vào đồ.
+    Weight: number,                  -- Tỉ lệ ra kịch bản này so với các kịch bản khác trong cùng bảng (SuccessPool/FailPool).
+                                     -- VD: Kịch bản "Siêu phẩm" Weight=10, kịch bản "Bình thường" Weight=90.
+                                     
+    Rolls: number?,                  -- Hệ thống Đa Mục Tiêu (Multi-Roll). Xác định số lượng dòng chỉ số sẽ rớt ra từ StatPools.
+                                     -- [QUAN TRỌNG]: 
+                                     -- Rolls = 0 hoặc nil: Sẽ nhận TẤT CẢ các dòng trong StatPools.
+                                     -- Rolls = N: Sẽ quay N lần. Mỗi lần trúng 1 dòng sẽ loại dòng đó ra khỏi rổ (Không cộng dồn trùng lặp).
+    
+    -- [PHẦN THƯỞNG / HÌNH PHẠT VỀ CHỈ SỐ LÕI]
+    StatPools: {StatRollEntry}?,     -- Kho chứa các dòng chỉ số để hệ thống quay (Dựa trên thông số Rolls ở trên).
 
     -- ==========================================
-    -- [THAY ĐỔI TRẠNG THÁI & HIỆU ỨNG CỨNG]
+    -- [THAY ĐỔI TRẠNG THÁI BỀN VỮNG - STATE]
     -- ==========================================
-    
-    -- ApplyStates: Lưu bùa chú vào vũ khí, tồn tại âm thầm và phát huy tác dụng ở các lần ép sau.
-    -- Các giá trị hợp lệ (Ghi chú chính xác theo ITEM_STATES):
-    --      "AntiNuke"          : Đỡ 1 đòn vỡ đồ (DestroyItem) ở lần ép xịt tương lai.
-    --      "AntiSlotGone"      : Ép xịt ở lần tới sẽ không bị trừ lượt ép (UpgradeCount).
-    --      "AntiPurity"        : Chống bị trừ điểm Tinh Khiết (Purity) nếu lần tới ép xịt.
-    --      "AntiCorruption"    : Chống bị cộng điểm Tha Hóa (Corruption) nếu lần tới ép xịt.
-    --      "AlwaysSuccess"     : Bùa hộ mệnh 100% thành công cho lần đập đồ kế tiếp.
-    --      "SayNoWithHolies"   : (State mở rộng hệ thống - Từ chối buff Holy).
-    --      "SayNoWithUpgrades" : (State mở rộng hệ thống - Khóa cường hóa).
-    --      "RarityAscended"    : Thăng 1 bậc phẩm chất (Rarity) cho món đồ (VD: Rare -> Epic).
-    --      "RarityDescended"   : Giáng 1 bậc phẩm chất (Không rớt dưới 1).
+    -- ApplyStates: Dán bùa chú/nhãn mác vào vũ khí. Tồn tại âm thầm trong mảng `ItemData.State`.
+    -- Các giá trị hợp lệ:
+    -- Bùa Tiêu Hao (Tự động xóa sau khi phát huy tác dụng):
+    --      "NukeProtection"          : Cứu 1 đòn vỡ đồ (DestroyItem). Dùng xong là mất bùa.
+    --      "AntiSlotGone"            : Giúp ép xịt lần tới không bị tính lượt (UpgradeCount).
+    --      "AntiPurity"              : Đỡ 1 cú trừ điểm Purity (Sẽ chặn roll < 0 của Purity về 0).
+    --      "AntiCorruption"          : Đỡ 1 cú cộng điểm Corruption (Sẽ chặn roll > 0 của Corruption về 0).
+    --      "AlwaysSuccess"           : Bùa hộ mệnh 100% thành công cho lần đập đồ kế tiếp.
+    -- Nhãn Đánh Dấu (Tồn tại vĩnh viễn):
+    --      "AntiNuke"                : Món đồ VIP miễn nhiễm vĩnh viễn với việc bị vỡ.
+    --      "RarityAscended"          : Mộc chứng nhận: "Đã từng được thăng bậc" (Để khóa không cho thăng 2 lần).
+    --      "RarityDescended"         : Mộc chứng nhận: "Đã từng bị rớt bậc".
+    --      "SayNoWithHolies"         : Từ chối buff Holy.
+    --      "SayNoWithUpgrades"       : Khóa cường hóa (Không cho ép thêm).
+    --      "UpgradeExtended"         : Mở rộng slot ép đồ Cấp 1 (MaxUpgrades + 1).
+    --      "GreatUpgradeExtended"    : Mở rộng slot ép đồ Cấp 2 (MaxUpgrades + 1, yêu cầu Cấp 1).
+    --      "UltimateUpgradeExtended" : Mở rộng slot ép đồ Cấp 3 (MaxUpgrades + 1, yêu cầu Cấp 2).
     ApplyStates: {string}?,          
     
+    -- ==========================================
+    -- [HIỆU ỨNG TỨC THỜI - SPECIAL EFFECTS]
+    -- ==========================================
     -- SpecialEffects: Kích hoạt LỆNH THỰC THI NGAY LẬP TỨC khi kịch bản này xảy ra.
     -- Các giá trị hợp lệ:
-    --      "DestroyItem"         : Phá hủy và xóa vĩnh viễn món đồ khỏi túi (Thường để ở FailPool).
-    --      "UpRarity"            : Tự động tăng phẩm chất (Rarity) của món đồ lên 1 bậc.
-    --      "DownRarity"          : Tự động giảm phẩm chất (Rarity) của món đồ xuống 1 bậc (Không rớt dưới 1).
-    --      "ResetUpgrades"       : Tẩy tủy! Trừ toàn bộ chỉ số đã được cộng thêm từ trước đến nay.
-    --      "ResetUpgradeSlots"   : Hồi phục toàn bộ số lượt đã ép (Đưa UpgradeCount về 0).
-    --      "ResetPurity"         : Đưa điểm Tinh Khiết về 0.
-    --      "ResetCorruption"     : Thanh tẩy toàn bộ điểm Tha Hóa (Corruption về 0).
-    --      "ResetFailedUpgrades" : Xóa bộ đếm số lần ép xịt trong NBT.
-    --      "ClearAllFailedUpgrades" : Tẩy tủy! Trừ toàn bộ các lần ép xịt.
-    --      "ClearOneFailedUpgrade" : Tẩy 1 lần ép xịt duy nhất.
+    --      "DestroyItem"            : Phá hủy và xóa vĩnh viễn món đồ (Sẽ bị chặn nếu có bùa NukeProtection/AntiNuke).
+    --      "UpRarity"               : Tự động thăng phẩm chất (Rarity) lên 1 bậc (Ví dụ: Rare -> Epic).
+    --      "DownRarity"             : Tự động giáng phẩm chất xuống 1 bậc (Không tụt dưới Common).
+    --      "ResetUpgrades"          : Cuộn giấy Tẩy Tủy! Xóa toàn bộ chỉ số cộng thêm, nhưng giữ lại base stats và Purity/Corruption.
+    --      "ResetUpgradeSlots"      : Cuộn giấy Reset Slot! Đưa số lượt ép (UpgradeCount) về lại 0.
+    --      "ResetPurity"            : Xóa trắng điểm Tinh Khiết (Đưa về 0).
+    --      "ResetCorruption"        : Thanh tẩy điểm Tha Hóa (Đưa về 0).
+    --      "ResetFailedUpgrades"    : Reset thẳng biến theo dõi FailedAttempts trong NBT về 0.
+    --      "ClearAllFailedUpgrades" : Cuộn giấy Hoàn Hồn! Hoàn trả TOÀN BỘ slot bị mất do ép xịt.
+    --      "ClearOneFailedUpgrade"  : Cuộn giấy Trắng (Clean Slate)! Cứu lại 1 slot ép xịt duy nhất.
     SpecialEffects: {string}?,       
 
     -- ==========================================
     -- [GIAO DIỆN & PHẢN HỒI CHO NGƯỜI CHƠI]
     -- ==========================================
-    Message: string,                 -- Dòng chữ hiện lên màn hình khi kịch bản này xảy ra.
-                                     -- VD: "Cây kiếm của bạn đã tỏa sáng rực rỡ!"
-    MessageColor: Color3,            -- Màu sắc của dòng thông báo trên để UI hiển thị cho trực quan.
+    Message: string,                 -- Dòng chữ hiện lên màn hình để báo cáo kết quả.
+                                     -- VD: "Cây kiếm của bạn đã tỏa sáng rực rỡ!" hoặc "Vũ khí đã tan thành tro bụi..."
+    MessageColor: Color3,            -- Mã màu (Color3) của dòng thông báo trên để UI in chữ (Xanh lá = tốt, Đỏ = xịt).
 }
+
 -- ==========================================
 -- 4. BỘ LUẬT NÂNG CẤP TỔNG (UPGRADE LOGIC)
 -- Khối dữ liệu gốc nằm bên trong mỗi viên đá/cuộn giấy nâng cấp (Material).
 -- ==========================================
 export type UpgradeLogic = {
-    AcceptTypes: {string},           -- Quy định loại đồ nào được phép xài viên đá này. 
-                                     -- VD: {"Weapon", "Armor"} (Không xài được cho Accessory). Dùng {"All"} nếu xài được hết.
+    AcceptTypes: {string},           -- Bộ lọc thông minh: Viên đá này dùng được cho loại đồ nào?
+                                     -- VD: {"Weapon"} (Áp dụng cho mọi vũ khí: Sword, Axe, Staff...). 
+                                     -- VD: {"Sword", "Katana"} (Chỉ giới hạn 2 loại này). Dùng {"All"} nếu cho phép mọi thứ.
                                      
-    UpgradeCountCost: number,        -- Ép viên đá này tốn bao nhiêu slot của món đồ. 
-                                     -- Đa số là 1. Đá tẩy tủy hoặc đá xịn có thể là 0.
+    UpgradeCountCost: number,        -- Đập viên đá này tốn bao nhiêu slot của món đồ (Thường là 1). Đá tẩy tủy có thể là 0.
 
     -- [TỈ LỆ THÀNH CÔNG]
-    BaseSuccessRate: number,         -- Tỉ lệ thành công gốc (Từ 0.0 đến 1.0). VD: 0.6 là 60%.
-    Conditions: {UpgradeCondition}?, -- Danh sách các điều kiện làm thay đổi cái tỉ lệ gốc ở trên.
+    BaseSuccessRate: number,         -- Tỉ lệ thành công gốc (Scale từ 0.0 đến 1.0). VD: 0.6 là 60%.
+    Conditions: {UpgradeCondition}?, -- Các Modifier (Bùa chú, Điều kiện) làm tăng/giảm cái tỉ lệ gốc ở trên.
 
-    -- [BẢNG KẾT QUẢ]
-    SuccessPool: {PoolOutcome},      -- Nếu thuật toán phán quyết là THÀNH CÔNG, quay random trong mảng này để ra kết quả tốt.
-    FailPool: {PoolOutcome}?,        -- Nếu thuật toán phán quyết là THẤT BẠI, quay random trong mảng này để ra kết quả xấu (hoặc vỡ đồ).
+    -- [BẢNG KẾT QUẢ ĐẦU RA]
+    SuccessPool: {PoolOutcome},      -- Nếu Đổ xí ngầu = THÀNH CÔNG, quay tiếp bảng này để xem kết quả ngon cỡ nào.
+    FailPool: {PoolOutcome}?,        -- Nếu Đổ xí ngầu = THẤT BẠI, quay bảng này để xem hình phạt (Mất trắng, hay Vỡ đồ).
 }
 
 return {}

@@ -104,7 +104,7 @@ local PROFILE_TEMPLATE = {
 	Land = {},
 	Quests = {
 		Active = {},    -- Nhiệm vụ đang làm
-		Completed = {}  -- Nhiệm vụ đã xong (Lưu ID để không nhận lại)
+		Completed = {}  -- Nhiệm vụ đã xong (Lưu Id để không nhận lại)
 	},
 }
 

@@ -2,7 +2,6 @@
 
 export type DismantleDropItem = {
 	Id: string,
-	Category: "Items" | "Materials" | "Consumables", -- BỔ SUNG DÒNG NÀY
 	Min: number, -- Nếu Items thì skip
 	Max: number, -- Nếu Items thì skip
 	Chance: number,

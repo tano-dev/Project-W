@@ -2,7 +2,7 @@
 local DataManager = require(game.ServerScriptService.Server.Systems.DataStore)
 local InventorySystem = require(game.ServerScriptService.Server.Systems.Inventory)
 local ItemDatabase = require(game.ReplicatedStorage.Shared.Constants.ItemData)
-local UpgradeTemplates = require(game.ReplicatedStorage.Shared.Components.UpgradeTemplate)
+-- local UpgradeTemplates = require(game.ReplicatedStorage.Shared.Components.UpgradeTemplate)
 local Players = game:GetService("Players")
 
 local UpgradeSystem = {}
@@ -335,7 +335,7 @@ function UpgradeSystem:ProcessUpgradeByIndex(
 		return false
 	end
 
-	local baseItemDef = ItemDatabase.Registry[itemData.ID]
+	local baseItemDef = ItemDatabase.Registry[itemData.Id]
 	local materialDef = ItemDatabase.Registry[materialStack.Id]
 
 	if not baseItemDef or not materialDef or not materialDef.UpgradeLogic then
@@ -518,25 +518,24 @@ function UpgradeSystem:ProcessUpgradeByIndex(
 		end
 	end
 
-	-- [CẢI TIẾN]: Quay chỉ số phụ đa mục tiêu
-	local statChangesLog = {}
-	if isSuccess then
-		ProcessStatRolls(selectedOutcome, newItemData, statChangesLog)
-	end
+-- [SỬA LỖI]: Bỏ điều kiện if isSuccess. 
+    -- Quay chỉ số phụ cho CẢ THÀNH CÔNG LẪN THẤT BẠI (Để lấy các dòng phạt như -Purity, +Corruption)
+    local statChangesLog = {}
+    ProcessStatRolls(selectedOutcome, newItemData, statChangesLog)
 
-	-- 8. GHI LOG (Chỉ ghi khi thành công)
-	if isSuccess then
-		ConsumeState(newItemData, ITEM_STATES.AlwaysSuccess)
-
-		-- CHỈ TIẾN HÀNH TẠO VÀ LƯU LOG NẾU CÓ CHỈ SỐ BỊ BIẾN ĐỔI
-		if next(statChangesLog) ~= nil then
+    -- 8. GHI LOG (Giữ nguyên logic: Chỉ ghi log khi thành công)
+    if isSuccess then
+        ConsumeState(newItemData, ITEM_STATES.AlwaysSuccess)
+        
+        -- CHỈ TIẾN HÀNH TẠO VÀ LƯU LOG NẾU CÓ CHỈ SỐ BỊ BIẾN ĐỔI
+        if next(statChangesLog) ~= nil then
 			-- Nếu chưa có mảng UpgradeHistory thì mới tạo
 			if not newItemData.UpgradeHistory then
 				newItemData.UpgradeHistory = {}
 			end
 
 			local historyEntry = {
-				Material = materialStack.TemplateId,
+				Material = materialStack.Id,
 				StatChanges = statChangesLog,
 				Time = os.time(),
 			}
@@ -604,43 +603,3 @@ function UpgradeSystem:Start()
 end
 
 return UpgradeSystem
-
---[[
-Hãy chỉnh lại hệ thống sao cho:
-- Thêm state cái "NukeProtection" để thay chức năng "AntiNuke" cho dễ hiểu hơn và khi thất bại, mà vũ khị bị phá huỷ nếu có trạng thái NukeProtection thì sẽ không bị phá hủy mà chỉ xịt bình thường và bỏ luôn cái "NukeProtection".
-- Khi thất bại, mà vũ khị bị phá huỷ nếu có trạng thái AntiNuke thì sẽ không bị phá hủy mà chỉ xịt bình thường mà vẫn giữ cái "AntiNuke" cho lần ép sau.
-- Khi thất bại thì sẽ không ghi lại log mà StatChanges: {[string]: number} là rỗng (tức là {}), thay vào đó chỉ cộng UpgradeCount (nếu có)
-- Thêm kiểm tra nếu tổng cộng nâng cấp vượt quá giới hạn MaxUpgrades của vật phẩm, nếu quá thì từ chối nâng cấp và trả về thông báo lỗi "Vật phẩm đã đạt giới hạn nâng cấp tối đa!".
-- Chỉnh lại cái "ResetUpgradeSlots" thành "ClearFailedUpgrades" cho dễ hiểu hơn và sẽ tính lại UpgradeCount dựa trên số lần ép thành công thay vì trực tiếp xóa UpgradeCount để bù lại cho việc không ghi log khi thất bại nữa.
-- Thêm cái state "UpgradeExtended", "GreatUpgradeExtended" và "UltimateUpgradeExtended" để khi có trạng thái này thì sẽ được cộng thêm 1 UpgradeSlot vĩnh viễn (ví dụ: MaxUpgrade +1) nhưng "GreatUpgradeExtended" chỉ thêm được khi có "UpgradeExtended" rồi và "UltimateUpgradeExtended" chỉ thêm được khi có "GreatUpgradeExtended" rồi.
-- Thêm cái rolls trong PoolOutcome để có thể roll nhiều chỉ số cùng lúc nếu trúng kịch bản đó (VD: Rolls=2 thì sẽ roll 2 dòng chỉ số trong StatPools để cộng vào đồ, nếu Rolls=0 hoặc nil thì sẽ roll tất cả các dòng chỉ số trong StatPools) và trong StatRollEntry nếu weight = 0 thì chắc chắn sẽ có chỉ số đó trong n lần roll (không lặp lại).
-export type StatRollEntry = {
-    StatName: string,
-
-    Min: number,
-    Max: number,
-
-    LevelScale: {
-        Min: number,
-        Max: number
-    }?,
-
-    Weight: number,
-}
-
-export type PoolOutcome = {
-    Weight: number,
-
-    Rolls: number?,
-
-    StatPools: {StatRollEntry}?,
-
-    ApplyStates: {string}?,
-
-    SpecialEffects: {string}?,
-
-    Message: string,
-
-    MessageColor: Color3,
-}
-]]

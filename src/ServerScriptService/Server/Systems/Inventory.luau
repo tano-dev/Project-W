@@ -197,7 +197,16 @@ function InventorySystem:UpdateItemData(player: Player, uuid: string, newItemDat
     warn("⚠️ Không thể cập nhật chỉ số! (Vật phẩm đang được mặc hoặc không tồn tại)")
     return false
 end
+-- [BỔ SUNG MỚI]: Thêm vật phẩm đã có sẵn dữ liệu (Dành cho Kế thừa Crafting / Trading)
+function InventorySystem:GiveCustomItem(player: Player, customItemData: table)
+    local profile = DataManager:GetProfile(player)
+    if not profile then return false end
 
+    -- Tùy chọn: Bạn có thể thêm code kiểm tra Full túi đồ ở đây sau này
+    
+    profile.Replica:TableInsert({"Inventories", "Items"}, customItemData)
+    return true
+end
 -- ==========================================
 -- LẮNG NGHE LỆNH CHAT ĐỂ TEST
 -- ==========================================
@@ -209,9 +218,9 @@ function InventorySystem:Start()
             table.remove(args, 1)
 
             -- [BƯỚC MỚI]: Bắt cờ auto-debug ở cuối câu
-            local autoDebug = false
+            -- local autoDebug = false
             if #args > 0 and string.lower(args[#args]) == "true" then
-                autoDebug = true
+                -- autoDebug = true
                 table.remove(args, #args) -- Cắt chữ "true" vứt đi để bảo vệ tên vật phẩm
             end
 
@@ -269,10 +278,10 @@ function InventorySystem:Start()
             end
 
             -- [BƯỚC MỚI]: Chạy bảng Debug nếu cờ được bật (và bỏ qua nếu lệnh gốc vốn đã là /debug để tránh in 2 lần)
-            if autoDebug and command ~= "/debug" then
-                print("🖥️ [Auto-Debug] In dữ liệu sau khi thực thi lệnh...")
-                DataManager:DebugProfile(player)
-            end
+            -- if autoDebug and command ~= "/debug" then
+            --     print("🖥️ [Auto-Debug] In dữ liệu sau khi thực thi lệnh...")
+            --     DataManager:DebugProfile(player)
+            -- end
         end)
     end)
 end

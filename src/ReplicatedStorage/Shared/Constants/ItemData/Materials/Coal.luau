@@ -1,8 +1,8 @@
--- File: Shared/Constants/ItemData/Materials/Iron.luau
+-- File: Shared/Constants/ItemData/Materials/Stone.luau
 local Stackable = require(game.ReplicatedStorage.Shared.Components.StackableTemplate)
 
 local Item: Stackable.StackableTemplate = {
-	Description = "Very pure iron ore, used for crafting.",
+	Description = "Very common coal, used for crafting.",
 	Rarity = "Common",
 
 	ItemType = "Material",
