@@ -5,6 +5,28 @@ local Players = game:GetService("Players")
 
 local PlayerStatSystem = {}
 
+-- Kiểm tra xem có đủ tiền không
+function PlayerStatSystem:HasCurrency(player: Player, currencyType: string, amount: number)
+    local profile = DataManager:GetProfile(player)
+    if profile and profile.Data.Currencies[currencyType] ~= nil then
+        return profile.Data.Currencies[currencyType] >= amount
+    end
+    return false
+end
+
+-- Trừ tiền an toàn
+function PlayerStatSystem:RemoveCurrency(player: Player, currencyType: string, amount: number)
+    local profile = DataManager:GetProfile(player)
+    if profile and profile.Data.Currencies[currencyType] ~= nil then
+        if profile.Data.Currencies[currencyType] >= amount then
+            local newValue = profile.Data.Currencies[currencyType] - amount
+            profile.Replica:Set({"Currencies", currencyType}, newValue)
+            return true
+        end
+    end
+    return false
+end
+
 -- ==========================================
 -- 1. XỬ LÝ TIỀN TỆ (Currencies)
 -- ==========================================

@@ -1,7 +1,7 @@
 -- File: Server/Systems/CraftingSystem.luau
 local DataManager = require(game.ServerScriptService.Server.Systems.DataStore)
 local InventorySystem = require(game.ServerScriptService.Server.Systems.Inventory)
-local PlayerStatSystem = require(game.ServerScriptService.Server.Systems.PlayerStatSystem) -- [MỚI]
+local PlayerStatSystem = require(game.ServerScriptService.Server.Systems.PlayerStats) -- [MỚI]
 local LevelingCalculator = require(game.ReplicatedStorage.Shared.Utilities.LevelingCalculator) -- [MỚI]
 local ItemDatabase = require(game.ReplicatedStorage.Shared.Constants.ItemData)
 local CraftingRecipes = require(game.ReplicatedStorage.Shared.Constants.CraftingRecipes)

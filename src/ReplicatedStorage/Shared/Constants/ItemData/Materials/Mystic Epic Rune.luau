@@ -3,7 +3,7 @@ local Stackable = require(game.ReplicatedStorage.Shared.Components.StackableTemp
 
 local Item: Stackable.StackableTemplate = {
 	Description = "A small rune used for basic enchantments. It hums with a faint magical energy.",
-	Rarity = "Epic",
+	Rarity = "Common",
 
 	ItemType = "Rune",
 	MaxStack = 9999, -- Xếp chồng thoải mái
@@ -15,10 +15,14 @@ local Item: Stackable.StackableTemplate = {
 	ConsumeOnUse = false, -- Bấm dùng không có tác dụng
 
 	-- [CẤU HÌNH ENCHANT RUNE]
-    RuneLogic = {
-        Tokens = 7,          -- Ném 2 lần xí ngầu (Tối đa nhận 1 dòng Lv2 hoặc 2 dòng Lv1)
-		EnchantingExp = 10, -- [MỚI] Cấp 1 Rune này sẽ cho 10 Exp nghề Enchanting khi sử dụng. Cấp cao hơn có thể tăng exp này lên (Tùy chỉnh trong hệ thống Enchanting).
-    }
+	RuneLogic = {
+		Attribute = nil, -- Lấy đồ trung tính
+		Tokens = 1,
+		Luck = 0,
+		Modifiers = {
+			MinRarity = "Epic", -- Nếu vũ khí đã max hết đồ Epic, Legendary, Mythic thì đập sẽ báo lỗi và không tốn Rune.
+		},
+	},
 }
 
 return Item

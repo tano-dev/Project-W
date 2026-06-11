@@ -106,6 +106,12 @@ local PROFILE_TEMPLATE = {
 		Active = {},    -- Nhiệm vụ đang làm
 		Completed = {}  -- Nhiệm vụ đã xong (Lưu Id để không nhận lại)
 	},
+
+	Farming = {
+		Crops = {},     -- Lưu trồng trọt (slotId = PlantData)
+		Trees = {},     -- Lưu cây ăn quả (slotId = PlantData)
+	},
+	ShopHistory = {}, -- Lưu lịch sử mua hàng (ShopId = {ItemId1, ItemId2,...}) để kiểm tra giới hạn mua hàng của từng shop
 }
 
 return PROFILE_TEMPLATE

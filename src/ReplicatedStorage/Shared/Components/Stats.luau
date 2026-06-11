@@ -71,7 +71,7 @@ local StatCategories = {
 		"MiningPristine",
 	},
 	Farming = {
-		"HarvestSpeed",
+		"GrowingSpeed",
 		"FarmingFortune",
 		"FarmingPristine",
 	},
