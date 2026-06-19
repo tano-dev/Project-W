@@ -18,9 +18,7 @@
 
 ## 🎯 WHAT IS PROJECT W?
 
-Project W is a **Roguelike Dungeon Crawler with Skill-Based Real-Time Combat**, inspired by **Slay The Spire 2** (roguelike progression) + **Clair Obscur: Expedition 33** (real-time action combat). 
-
-Core economy systems (inventory, crafting, enchanting, farming, shop) complete Phase 1. Phase 2 adds procedural dungeons, 3 classes, skill learning system, and real-time combat.
+Project W is a **Roblox Roguelike Dungeon Crawler** with a sophisticated backend system. The core economy systems (inventory, crafting, enchanting, farming, shop) are complete. Phase 2 adds procedural dungeon generation, instance-based gameplay, and roguelike progression.
 
 ### Core Features (Phase 1 ✅):
 - 🎒 **Advanced Inventory System** (3 bag types, NBT support, UUID tracking)
@@ -210,8 +208,8 @@ Project Structure:
 
 ## 🛠️ TECH STACK
 
-- **Language**: Luau (Roblox)
-- **Platform**: Roblox
+- **Language**: Luau ()
+- **Platform**: 
 - **Data Sync**: Replica (real-time player-server sync)
 - **Data Persistence**: ProfileStore
 - **Storage**: MemoryStore (for global shop limits)
@@ -270,8 +268,7 @@ Total Timeline: ~10-13 weeks
 
 | Khía Cạnh | Chi Tiết |
 |-----------|---------|
-| **Loại Game** | Roblox Roguelike Dungeon Crawler (Slay The Spire 2 + Clair Obscur style) |
-| **Combat Style** | Real-time action (NOT turn-based) |
+| **Loại Game** | Roblox Roguelike Dungeon Crawler |
 | **Ngôn Ngữ** | Luau (Roblox) |
 | **Kiến Trúc** | Server-Client (Replica-based, Matter ECS) |
 | **Classes** | 3 (Hunter, Warrior, Mage) |
@@ -403,7 +400,7 @@ PlayerStatSystem:AddProfessionExp(player, "Crafting", 500)
 ## ❓ FAQ
 
 **Q: Can I run the game right now?**  
-A: Yes! Download Roblox, open the project, and run. Use chat commands to test.
+A: Yes! Download , open the project, and run. Use chat commands to test.
 
 **Q: Can I add new items without coding?**  
 A: Almost! Create a new .luau file in ItemData folder, fill in data, add to init.luau.
@@ -439,7 +436,7 @@ code .
 
 ### Step 3: Test the Game
 ```
-1. Open Roblox Studio
+1. Open  Studio
 2. Load project
 3. Run game
 4. Type: /debug
