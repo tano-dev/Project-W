@@ -18,7 +18,9 @@
 
 ## 🎯 WHAT IS PROJECT W?
 
-Project W is a **Roblox Roguelike Dungeon Crawler** with a sophisticated backend system. The core economy systems (inventory, crafting, enchanting, farming, shop) are complete. Phase 2 adds procedural dungeon generation, instance-based gameplay, and roguelike progression.
+Project W is a **Roguelike Dungeon Crawler with Skill-Based Real-Time Combat**, inspired by **Slay The Spire 2** (roguelike progression) + **Clair Obscur: Expedition 33** (real-time action combat). 
+
+Core economy systems (inventory, crafting, enchanting, farming, shop) complete Phase 1. Phase 2 adds procedural dungeons, 3 classes, skill learning system, and real-time combat.
 
 ### Core Features (Phase 1 ✅):
 - 🎒 **Advanced Inventory System** (3 bag types, NBT support, UUID tracking)
@@ -35,8 +37,12 @@ Project W is a **Roblox Roguelike Dungeon Crawler** with a sophisticated backend
 - 🗺️ **Procedural Dungeon Generation** (weighted rooms, difficulty scaling)
 - 🎮 **Instance Management** (isolated player dungeons, no interference)
 - 👹 **Enemy System** (mob types, scaling, loot drops)
-- 🎁 **Roguelike Buffs** (3-choice selection after rooms, permanent for run)
-- 🗝️ **Room Types** (Combat, Treasure, Shop, Rest, Boss)
+- ⚡ **Skill-Based Combat** (Real-time action, not turn-based!)
+- 🎭 **3 Classes**: Hunter (Ranged DPS), Warrior (Tank), Mage (AOE Magic)
+- 💡 **Skill Learning** (Start 2, learn up to 6 skills)
+- 🎁 **Roguelike Skill Offering** (3 random skills after room clear - pick 1!)
+- 🏕️ **Campfire Mechanic** (Rest/heal, learn new skill)
+- 🗝️ **Room Types** (Combat, Treasure, Shop, Rest/Campfire, Boss)
 - 📊 **Minimap** (fog of war, room exploration tracking)
 - ⚡ **Status Effects** (Poison, Burn, Stun, Bleed - turn-based damage)
 - 🎲 **Weighted Loot Tables** (gacha-style drops with rarity)
@@ -68,6 +74,16 @@ Complete API documentation (20-30 min read). For developers:
 - Code examples
 - Error handling
 - Common patterns
+
+### **[⚡ SKILL_SYSTEM_DESIGN.md](SKILL_SYSTEM_DESIGN.md)** - **NEW GAME DESIGN**
+Complete skill & combat system design inspired by **Slay The Spire 2 + Clair Obscur Expedition 33** (20-30 min read):
+- 🎭 3 Classes (Hunter, Warrior, Mage) with unique skill pools
+- ⚡ 6-slot skill system (start with 2, learn up to 6)
+- 🔥 Real-time action combat (NOT turn-based)
+- 🏕️ Campfire mechanic (rest + learn skills)
+- 🎲 Skill offering algorithm (3 random skills per room)
+- ⚙️ Balance parameters & progression flow
+- 🎮 Example skill trees & combat UI mockups
 
 ### **[📁 PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - DETAILED STRUCTURE
 Complete project tree with all files, systems, and components (20-30 min read):
@@ -254,10 +270,13 @@ Total Timeline: ~10-13 weeks
 
 | Khía Cạnh | Chi Tiết |
 |-----------|---------|
-| **Loại Game** | Roblox Roguelike Dungeon Crawler |
+| **Loại Game** | Roblox Roguelike Dungeon Crawler (Slay The Spire 2 + Clair Obscur style) |
+| **Combat Style** | Real-time action (NOT turn-based) |
 | **Ngôn Ngữ** | Luau (Roblox) |
 | **Kiến Trúc** | Server-Client (Replica-based, Matter ECS) |
-| **Hệ Thống Chính** | 16+ (9 Core + 7 Roguelike) |
+| **Classes** | 3 (Hunter, Warrior, Mage) |
+| **Skill System** | 6 slots/player (start 2, learn 1 per campfire) |
+| **Hệ Thống Chính** | 16+ systems |
 | **Dữ Liệu** | ProfileStore + Replica + MemoryStore |
 | **Item Loại** | 3 (Unique Items, Materials, Consumables) |
 | **Professions** | 9+ (Crafting, Enchanting, Farming, Combat, etc.) |
@@ -265,9 +284,10 @@ Total Timeline: ~10-13 weeks
 | **Cửa Hàng** | 3+ loại (Villager, Dark Merchant, Scam Villager) |
 | **Bùa** | 6+ loại (Sharpness, Life Steal, Fire Burst, etc.) |
 | **Quái Vật** | 4+ loại (Goblin, Bandit, Elemental, Boss) |
-| **Kiểu Phòng** | 5+ (Combat, Treasure, Shop, Rest, Boss) |
-| **Buff Roguelike** | 20+ (tùy chỉnh) |
-| **Code Lines** | ~2000 (Phase 1) + ~2500 (Phase 2) |
+| **Kiểu Phòng** | 6 (Combat, Treasure, Shop, Campfire, Boss, Secret) |
+| **Skills** | 50+ (Hunter/Warrior/Mage specific) |
+| **Skill Rarities** | 5 (Common → Legendary) |
+| **Code Lines** | ~2000 (Phase 1) + ~3000 (Phase 2) |
 
 ### NBT System
 Named Binary Tag - extensible data on items. Used for:

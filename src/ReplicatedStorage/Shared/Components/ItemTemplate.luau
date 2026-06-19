@@ -12,9 +12,9 @@ export type ItemTemplate = {
 	Description: string,
 	Rarity: "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary" | "Mythic",
 
-	ItemType: "Equipment",
+	ItemType: "Weapon" | "Armor" | "Helmet" | "Armor" | "Boots",
 	EquipmentSlot: "MainHand" | "OffHand" | "Helmet" | "Chest" | "Legs" | "Accessory",
-	WeaponType: string?,
+	WeaponType: string?, -- VD: "Sword", "Axe", "Bow", "Staff". Chỉ áp dụng nếu ItemType là "Weapon"
 
 	Requirements: {
 		Level: number,

@@ -3,30 +3,235 @@ local DataManager = require(game.ServerScriptService.Server.Systems.DataStore)
 local ItemFactory = require(game.ReplicatedStorage.Shared.Components.ItemData)
 local StackableFactory = require(game.ReplicatedStorage.Shared.Components.StackableData)
 local HttpService = game:GetService("HttpService")
--- [BỔ SUNG] Cần require Database để check giới hạn MaxStack của vật phẩm
 local ItemDatabase = require(game.ReplicatedStorage.Shared.Constants.ItemData)
 local Players = game:GetService("Players")
 
 local InventorySystem = {}
 
 -- ==========================================
--- HÀM HỖ TRỢ: SO SÁNH NBT
+-- CẤU HÌNH HỆ THỐNG TRANG BỊ
 -- ==========================================
+
+-- Chỉ những Class này mới được phép trang bị vào Slot Offhand
+local ALLOWED_OFFHAND_CLASSES = {
+	["Assassin"] = true,
+	["Tanker"] = true,
+	["Paladin"] = true,
+	["Mage"] = true,
+}
+
+-- Ánh xạ từ "EquipmentSlot" trong ItemTemplate sang key thực tế trong ProfileTemplate.Equipped
+local SLOT_MAP = {
+	["MainHand"] = "Weapon",
+	["OffHand"] = "Offhand",
+	["Helmet"] = "Helmet",
+	["Chest"] = "Armor",
+	["Legs"] = "Boots",
+	["Accessory"] = "Accessory",
+}
+
+-- ==========================================
+-- HÀM HỖ TRỢ
+-- ==========================================
+
 local function CompareNBT(nbt1, nbt2)
-	-- Nếu cả 2 đều nil -> giống nhau
 	if not nbt1 and not nbt2 then
 		return true
 	end
-	-- Nếu 1 trong 2 nil -> khác nhau
 	if not nbt1 or not nbt2 then
 		return false
 	end
-	-- Chuyển thành chuỗi để so sánh chính xác các trường bên trong
 	return HttpService:JSONEncode(nbt1) == HttpService:JSONEncode(nbt2)
 end
 
+-- Trích xuất thông tin người mặc (Player hoặc NPC)
+local function GetEntityInfo(profile: table, entityId: string)
+	if entityId == "Player" then
+		return {
+			Class = profile.Data.Classes.SelectedClass,
+			Level = profile.Data.Core.Level,
+			EquippedDict = profile.Data.Equipped,
+			UpdatePath = { "Equipped" },
+		}
+	else
+		local companion = profile.Data.Companions[entityId]
+		if not companion then
+			return nil
+		end
+		if not companion.Unlocked then
+			return nil
+		end
+
+		return {
+			Class = companion.Class,
+			Level = 1, -- (Có thể map với Level của NPC sau này)
+			EquippedDict = companion.Equipped,
+			UpdatePath = { "Companions", entityId, "Equipped" },
+		}
+	end
+end
+
 -- ==========================================
--- 1. API: THÊM VẬT PHẨM (GIVE)
+-- 1. API: TÌM KIẾM ĐỊNH VỊ VẬT PHẨM (TRUNG TÂM)
+-- ==========================================
+function InventorySystem:GetItemDataByUUID(player: Player, uuid: string)
+	local profile = DataManager:GetProfile(player)
+	if not profile then
+		return nil
+	end
+
+	local result = {
+		ItemData = nil,
+		Index = nil,
+		IsEquipped = false,
+		EntityId = nil,
+		EquipSlot = nil,
+	}
+
+	-- 1. Tìm trong túi
+	for i, item in ipairs(profile.Data.Inventories.Items) do
+		if item.UUID == uuid then
+			result.ItemData = item
+			result.Index = i
+			break
+		end
+	end
+
+	if not result.Index then
+		return nil
+	end
+
+	-- 2. Quét mảng Equipped của Player (Đã sửa lỗi vòng lặp)
+	for slotName, equippedUUID in pairs(profile.Data.Equipped) do
+		if equippedUUID == uuid then
+			result.IsEquipped = true
+			result.EntityId = "Player"
+			result.EquipSlot = slotName
+			return result
+		end
+	end
+
+	-- 3. Quét mảng Equipped của NPC Companions
+	for compId, compData in pairs(profile.Data.Companions) do
+		for slotName, equippedUUID in pairs(compData.Equipped) do
+			if equippedUUID == uuid then
+				result.IsEquipped = true
+				result.EntityId = compId
+				result.EquipSlot = slotName
+				return result
+			end
+		end
+	end
+
+	return result
+end
+
+-- ==========================================
+-- 2. API: TRANG BỊ & GỠ TRANG BỊ
+-- ==========================================
+
+function InventorySystem:EquipItem(player: Player, uuid: string, targetEntityId: string)
+	targetEntityId = targetEntityId or "Player"
+	local profile = DataManager:GetProfile(player)
+	if not profile then
+		return { Success = false, Message = "Lỗi tải dữ liệu!" }
+	end
+
+	local itemInfo = self:GetItemDataByUUID(player, uuid)
+	if not itemInfo then
+		return { Success = false, Message = "Không tìm thấy vật phẩm trong túi đồ!" }
+	end
+	if itemInfo.IsEquipped then
+		return {
+			Success = false,
+			Message = string.format("Vật phẩm đang được mặc bởi %s!", itemInfo.EntityId),
+		}
+	end
+
+	local itemDef = ItemDatabase.Registry[itemInfo.ItemData.Id]
+	if not itemDef then
+		return { Success = false, Message = "Lỗi dữ liệu vật phẩm gốc!" }
+	end
+
+	-- Lấy EquipSlot thực tế từ SLOT_MAP
+	local equipSlot = SLOT_MAP[itemDef.EquipmentSlot]
+	if not equipSlot then
+		return { Success = false, Message = "Vật phẩm này không có vị trí mặc hợp lệ!" }
+	end
+
+	local entityInfo = GetEntityInfo(profile, targetEntityId)
+	if not entityInfo then
+		return { Success = false, Message = "Không tìm thấy thông tin nhân vật/NPC này!" }
+	end
+
+	-- BỘ LỌC 1: KIỂM TRA LEVEL & CLASS
+	local reqs = itemDef.Requirements
+	if reqs then
+		if reqs.Level and entityInfo.Level < reqs.Level then
+			return { Success = false, Message = string.format("Cần đạt Cấp %d để trang bị!", reqs.Level) }
+		end
+		if reqs.Classes and #reqs.Classes > 0 then
+			if not table.find(reqs.Classes, entityInfo.Class) then
+				return {
+					Success = false,
+					Message = "Hệ phái của bạn không thể sử dụng vật phẩm này!",
+				}
+			end
+		end
+	end
+
+	-- BỘ LỌC 2: KIỂM TRA LUẬT VŨ KHÍ PHỤ (OFFHAND)
+	if equipSlot == "Offhand" and not ALLOWED_OFFHAND_CLASSES[entityInfo.Class] then
+		return {
+			Success = false,
+			Message = string.format("Hệ phái [%s] không thể mang vũ khí phụ!", entityInfo.Class),
+		}
+	end
+
+	-- BỘ LỌC 3: BIND-ON-EQUIP
+	if itemDef.BindType == "BindOnEquip" and itemInfo.ItemData.BindState == "Unlocked" then
+		profile.Replica:Set({ "Inventories", "Items", itemInfo.Index, "BindState" }, "Bound")
+	end
+
+	-- Thực thi: Ghi UUID vào Slot tương ứng
+	local finalPath = { unpack(entityInfo.UpdatePath) }
+	table.insert(finalPath, equipSlot)
+	profile.Replica:Set(finalPath, uuid)
+
+	return {
+		Success = true,
+		Message = string.format("Đã trang bị [%s] cho %s", itemDef.Name or itemInfo.ItemData.Id, targetEntityId),
+	}
+end
+
+function InventorySystem:UnequipItem(player: Player, equipSlot: string, targetEntityId: string)
+	targetEntityId = targetEntityId or "Player"
+	local profile = DataManager:GetProfile(player)
+	if not profile then
+		return { Success = false, Message = "Lỗi tải dữ liệu!" }
+	end
+
+	local entityInfo = GetEntityInfo(profile, targetEntityId)
+	if not entityInfo then
+		return { Success = false, Message = "Không tìm thấy thông tin nhân vật/NPC này!" }
+	end
+
+	if not entityInfo.EquippedDict[equipSlot] then
+		return { Success = false, Message = "Slot này hiện không có trang bị nào!" }
+	end
+
+	local finalPath = { unpack(entityInfo.UpdatePath) }
+	table.insert(finalPath, equipSlot)
+	profile.Replica:Set(finalPath, nil)
+
+	return {
+		Success = true,
+		Message = string.format("Đã gỡ trang bị ở Slot %s của %s", equipSlot, targetEntityId),
+	}
+end
+
+-- ==========================================
+-- 3. API: THÊM & XÓA VẬT PHẨM (ĐỘC NHẤT)
 -- ==========================================
 
 function InventorySystem:GiveItem(player: Player, Id: string)
@@ -34,7 +239,6 @@ function InventorySystem:GiveItem(player: Player, Id: string)
 	if not profile then
 		return nil
 	end
-
 	local newItem = ItemFactory.createNewItem(Id)
 	if newItem then
 		profile.Replica:TableInsert({ "Inventories", "Items" }, newItem)
@@ -43,126 +247,97 @@ function InventorySystem:GiveItem(player: Player, Id: string)
 	return nil
 end
 
--- ==========================================
--- 1. API: THÊM STACKABLE (HỖ TRỢ NBT)
--- ==========================================
--- [BỔ SUNG]: Tham số customNBT để chèn dữ liệu động (như PlantId) vào lúc cấp phát
-function InventorySystem:GiveStackable(player: Player, category: string, Id: string, amount: number, customNBT: table?)
+function InventorySystem:GiveCustomItem(player: Player, customItemData: table)
 	local profile = DataManager:GetProfile(player)
 	if not profile then
-		return
+		return false
 	end
-
-	if category ~= "Consumables" and category ~= "Materials" then
-		return
-	end
-
-	local inventory = profile.Data.Inventories[category]
-	local amountLeft = amount
-
-	local itemDef = ItemDatabase.Registry[Id]
-	local maxStack = (itemDef and itemDef.MaxStack) or 99
-
-	-- BƯỚC 1: Lấp đầy các Stack còn thiếu chỗ (Chỉ gộp nếu NBT giống y hệt nhau)
-	for index, itemData in ipairs(inventory) do
-		if itemData.Id == Id and itemData.Amount < maxStack and CompareNBT(itemData.NBT, customNBT) then
-			local spaceLeft = maxStack - itemData.Amount
-			local amountToAdd = math.min(amountLeft, spaceLeft)
-
-			profile.Replica:Set({ "Inventories", category, index, "Amount" }, itemData.Amount + amountToAdd)
-			amountLeft -= amountToAdd
-
-			if amountLeft <= 0 then
-				break
-			end
-		end
-	end
-
-	-- BƯỚC 2: Nếu lấp đầy rồi mà vẫn dư đồ, tạo các Stack mới mang NBT
-	while amountLeft > 0 do
-		local amountForNewStack = math.min(amountLeft, maxStack)
-		local newStack = StackableFactory.create(Id, amountForNewStack)
-
-		-- Nếu có NBT truyền vào, gán nó vào Stack mới
-		if customNBT then
-			newStack.NBT = HttpService:JSONDecode(HttpService:JSONEncode(customNBT)) -- Deep copy an toàn
-		end
-
-		profile.Replica:TableInsert({ "Inventories", category }, newStack)
-		amountLeft -= amountForNewStack
-	end
+	profile.Replica:TableInsert({ "Inventories", "Items" }, customItemData)
+	return true
 end
 
--- ==========================================
--- 2. API: ĐỊNH VỊ VÀ XÓA VẬT PHẨM
--- ==========================================
-
--- Lấy UUID từ trang bị đang mặc (VD: Lấy vũ khí đang cầm)
-function InventorySystem:GetEquippedUUID(player: Player, equipCategory: string, slotName: string)
-	local profile = DataManager:GetProfile(player)
-	if not profile then
-		return nil
-	end
-
-	local categoryData = profile.Data.Equipped[equipCategory]
-	if categoryData then
-		return categoryData[slotName] -- Trả về UUID hoặc nil
-	end
-	return nil
-end
-
--- CẢI TIẾN: Tìm vị trí của vật phẩm (Trong túi hoặc đang mặc trên người)
-function InventorySystem:FindItemLocationByUUID(player: Player, uuid: string)
-	local profile = DataManager:GetProfile(player)
-	if not profile then
-		return nil
-	end
-
-	-- 1. Quét trong túi đồ Items
-	for index, itemData in ipairs(profile.Data.Inventories.Items) do
-		if itemData.UUID == uuid then
-			return { Location = "Inventory", Index = index }
-		end
-	end
-
-	-- 2. Quét trong Trang Bị (Equipped)
-	for equipCategory, slots in pairs(profile.Data.Equipped) do
-		for slotName, equippedUUID in pairs(slots) do
-			if equippedUUID == uuid then
-				return { Location = "Equipped", Category = equipCategory, Slot = slotName }
-			end
-		end
-	end
-
-	return nil -- Không tìm thấy
-end
-
--- Xóa đồ độc nhất (Hỗ trợ xóa cả khi đang mặc trên người)
 function InventorySystem:RemoveItemByUUID(player: Player, uuid: string)
 	local profile = DataManager:GetProfile(player)
 	if not profile then
 		return false
 	end
 
-	local locationData = self:FindItemLocationByUUID(player, uuid)
+	local itemInfo = self:GetItemDataByUUID(player, uuid)
+	if not itemInfo then
+		return false
+	end
 
-	if locationData then
-		if locationData.Location == "Inventory" then
-			-- Nếu nằm trong túi, dùng TableRemove
-			profile.Replica:TableRemove({ "Inventories", "Items" }, locationData.Index)
-		elseif locationData.Location == "Equipped" then
-			-- Nếu đang mặc, ép vị trí đó về nil
-			profile.Replica:Set({ "Equipped", locationData.Category, locationData.Slot }, nil)
-		end
+	-- Nếu đang mặc, lột ra trước
+	if itemInfo.IsEquipped then
+		local updatePath = itemInfo.EntityId == "Player" and { "Equipped", itemInfo.EquipSlot }
+			or { "Companions", itemInfo.EntityId, "Equipped", itemInfo.EquipSlot }
+		profile.Replica:Set(updatePath, nil)
+	end
+
+	profile.Replica:TableRemove({ "Inventories", "Items" }, itemInfo.Index)
+	return true
+end
+
+-- ==========================================
+-- 4. API: CẬP NHẬT CHỈ SỐ VẬT PHẨM
+-- ==========================================
+function InventorySystem:UpdateItemData(player: Player, uuid: string, newItemData: table)
+	local profile = DataManager:GetProfile(player)
+	if not profile then
+		return false
+	end
+
+	local itemInfo = self:GetItemDataByUUID(player, uuid)
+	-- Dù đang mặc hay cất trong túi, dữ liệu gốc luôn nằm ở Inventories.Items
+	if itemInfo and itemInfo.Index then
+		profile.Replica:Set({ "Inventories", "Items", itemInfo.Index }, newItemData)
 		return true
 	end
+
+	warn("⚠️ Không thể cập nhật chỉ số! (Vật phẩm không tồn tại)")
 	return false
 end
 
 -- ==========================================
--- 2. API: TRỪ/XÓA STACKABLE (HỖ TRỢ NBT)
+-- 5. API: THÊM & XÓA STACKABLE (GỘP CHUNG NBT)
 -- ==========================================
--- [BỔ SUNG]: Tham số targetNBT để chỉ trừ đúng loại hạt giống (Ví dụ: Chỉ trừ hạt Lúa mì)
+function InventorySystem:GiveStackable(player: Player, category: string, Id: string, amount: number, customNBT: table?)
+	local profile = DataManager:GetProfile(player)
+	if not profile then
+		return
+	end
+	if category ~= "Consumables" and category ~= "Materials" then
+		return
+	end
+
+	local inventory = profile.Data.Inventories[category]
+	local amountLeft = amount
+	local itemDef = ItemDatabase.Registry[Id]
+	local maxStack = (itemDef and itemDef.MaxStack) or 99
+
+	for index, itemData in ipairs(inventory) do
+		if itemData.Id == Id and itemData.Amount < maxStack and CompareNBT(itemData.NBT, customNBT) then
+			local spaceLeft = maxStack - itemData.Amount
+			local amountToAdd = math.min(amountLeft, spaceLeft)
+			profile.Replica:Set({ "Inventories", category, index, "Amount" }, itemData.Amount + amountToAdd)
+			amountLeft -= amountToAdd
+			if amountLeft <= 0 then
+				break
+			end
+		end
+	end
+
+	while amountLeft > 0 do
+		local amountForNewStack = math.min(amountLeft, maxStack)
+		local newStack = StackableFactory.create(Id, amountForNewStack)
+		if customNBT then
+			newStack.NBT = HttpService:JSONDecode(HttpService:JSONEncode(customNBT))
+		end
+		profile.Replica:TableInsert({ "Inventories", category }, newStack)
+		amountLeft -= amountForNewStack
+	end
+end
+
 function InventorySystem:RemoveStackable(
 	player: Player,
 	category: string,
@@ -174,26 +349,21 @@ function InventorySystem:RemoveStackable(
 	if not profile then
 		return false
 	end
-
 	local inventory = profile.Data.Inventories[category]
 
-	-- Bước 1: Kiểm tra xem có đủ số lượng (cùng NBT) để trừ không
 	local totalHas = 0
 	for _, item in ipairs(inventory) do
 		if item.Id == Id and CompareNBT(item.NBT, targetNBT) then
 			totalHas += item.Amount
 		end
 	end
-
 	if totalHas < amountToRemove then
 		return false
 	end
 
-	-- Bước 2: Bắt đầu trừ từ Stack cuối cùng lên
 	local amountLeftToRemove = amountToRemove
 	for i = #inventory, 1, -1 do
 		local itemData = inventory[i]
-
 		if itemData.Id == Id and CompareNBT(itemData.NBT, targetNBT) then
 			if itemData.Amount > amountLeftToRemove then
 				profile.Replica:Set({ "Inventories", category, i, "Amount" }, itemData.Amount - amountLeftToRemove)
@@ -208,11 +378,9 @@ function InventorySystem:RemoveStackable(
 			end
 		end
 	end
-
 	return true
 end
 
--- Dọn sạch toàn bộ túi (Dùng cho test)
 function InventorySystem:ClearInventory(player: Player)
 	local profile = DataManager:GetProfile(player)
 	if profile then
@@ -223,38 +391,6 @@ function InventorySystem:ClearInventory(player: Player)
 end
 
 -- ==========================================
--- 3. API: THAY ĐỔI CHỈ SỐ VẬT PHẨM
--- ==========================================
-
--- Dùng cho hệ thống Enchant, Reforge
-function InventorySystem:UpdateItemData(player: Player, uuid: string, newItemData: table)
-	local profile = DataManager:GetProfile(player)
-	if not profile then
-		return false
-	end
-
-	local locationData = self:FindItemLocationByUUID(player, uuid)
-	if locationData and locationData.Location == "Inventory" then
-		profile.Replica:Set({ "Inventories", "Items", locationData.Index }, newItemData)
-		return true
-	end
-
-	warn("⚠️ Không thể cập nhật chỉ số! (Vật phẩm đang được mặc hoặc không tồn tại)")
-	return false
-end
--- [BỔ SUNG MỚI]: Thêm vật phẩm đã có sẵn dữ liệu (Dành cho Kế thừa Crafting / Trading)
-function InventorySystem:GiveCustomItem(player: Player, customItemData: table)
-	local profile = DataManager:GetProfile(player)
-	if not profile then
-		return false
-	end
-
-	-- Tùy chọn: Bạn có thể thêm code kiểm tra Full túi đồ ở đây sau này
-
-	profile.Replica:TableInsert({ "Inventories", "Items" }, customItemData)
-	return true
-end
--- ==========================================
 -- LẮNG NGHE LỆNH CHAT ĐỂ TEST
 -- ==========================================
 function InventorySystem:Start()
@@ -264,69 +400,80 @@ function InventorySystem:Start()
 			local command = string.lower(args[1])
 			table.remove(args, 1)
 
-			-- [BƯỚC MỚI]: Bắt cờ auto-debug ở cuối câu
-			-- local autoDebug = false
-			if #args > 0 and string.lower(args[#args]) == "true" then
-				-- autoDebug = true
-				table.remove(args, #args) -- Cắt chữ "true" vứt đi để bảo vệ tên vật phẩm
-			end
+			-- CÚ PHÁP MỚI: /equip [Vị trí Index] [TargetEntity]
+			-- VD: /equip 1 Player (Mặc đồ ở ô số 1 cho Player)
+			-- VD: /equip 2 Gustave (Mặc đồ ở ô số 2 cho Gustave)
+			if command == "/equip" then
+				local itemIndex = tonumber(args[1])
+				local targetEntity = args[2] or "Player"
 
-			if command == "/giveitem" then
+				if itemIndex then
+					local profile = DataManager:GetProfile(player)
+					if profile then
+						local itemData = profile.Data.Inventories.Items[itemIndex]
+						if itemData then
+							-- Lấy UUID từ vị trí Index và gọi hàm
+							local result = self:EquipItem(player, itemData.UUID, targetEntity)
+							print(result.Success and "✅" or "❌", result.Message)
+						else
+							print("❌ Không tìm thấy vật phẩm ở ô số " .. itemIndex .. "!")
+						end
+					end
+				else
+					print("❌ Cú pháp sai! Vui lòng nhập số Index. VD: /equip 1")
+				end
+
+			-- /unequip [SlotName] [TargetEntity]
+			-- VD: /unequip Weapon Player
+			elseif command == "/unequip" then
+				local slotName = args[1]
+				local targetEntity = args[2] or "Player"
+				if slotName then
+					local result = self:UnequipItem(player, slotName, targetEntity)
+					print(result.Success and "✅" or "❌", result.Message)
+				end
+
+			-- /giveitem [Id Vật phẩm]
+			elseif command == "/giveitem" then
 				local itemId = table.concat(args, " ")
 				if itemId ~= "" then
-					self:GiveItem(player, itemId)
+					local uuid = self:GiveItem(player, itemId)
+					print("✅ Đã nhận vật phẩm mới. UUID:", uuid)
 				end
+
+			-- /givestackable [Số lượng] [Id Vật phẩm]
 			elseif command == "/givestackable" then
 				local amount = tonumber(args[#args]) or 1
 				if type(tonumber(args[#args])) == "number" then
 					table.remove(args, #args)
 				end
 				local itemId = table.concat(args, " ")
-
 				if itemId ~= "" then
-					print("🖥️ Lệnh: Nhận " .. amount .. " " .. itemId)
 					self:GiveStackable(player, "Materials", itemId, amount)
+					print("✅ Lệnh: Nhận", amount, itemId)
 				end
-			elseif command == "/removestackable" then
-				local amount = tonumber(args[#args]) or 1
-				if type(tonumber(args[#args])) == "number" then
-					table.remove(args, #args)
-				end
-				local itemId = table.concat(args, " ")
 
-				if itemId ~= "" then
-					print("🖥️ Lệnh: Xóa " .. amount .. " " .. itemId)
-					local success = self:RemoveStackable(player, "Materials", itemId, amount)
-					if success then
-						print("✅ Xóa thành công!")
-					else
-						print("❌ Không đủ đồ để xóa!")
-					end
-				end
+			-- /testlocation
 			elseif command == "/testlocation" then
 				local profile = DataManager:GetProfile(player)
 				if profile and #profile.Data.Inventories.Items > 0 then
 					local targetUUID = profile.Data.Inventories.Items[1].UUID
-					local loc = self:FindItemLocationByUUID(player, targetUUID)
-
+					local loc = self:GetItemDataByUUID(player, targetUUID)
 					if loc then
 						print("🔍 UUID:", targetUUID)
-						print("📍 Đang nằm ở:", loc.Location, "(Index/Slot:", loc.Index or loc.Slot, ")")
+						print(
+							"📍 Đang mặc:",
+							loc.IsEquipped and ("Có (Bởi: " .. loc.EntityId .. " - Slot: " .. loc.EquipSlot .. ")")
+								or "Không"
+						)
 					end
 				end
+
+			-- /clearinventory
 			elseif command == "/clearinventory" then
 				self:ClearInventory(player)
-
-				-- elseif command == "/debug" then
-				--     -- Lệnh gọi thủ công
-				--     DataManager:DebugProfile(player)
+				print("🗑️ Đã dọn sạch túi đồ!")
 			end
-
-			-- [BƯỚC MỚI]: Chạy bảng Debug nếu cờ được bật (và bỏ qua nếu lệnh gốc vốn đã là /debug để tránh in 2 lần)
-			-- if autoDebug and command ~= "/debug" then
-			--     print("🖥️ [Auto-Debug] In dữ liệu sau khi thực thi lệnh...")
-			--     DataManager:DebugProfile(player)
-			-- end
 		end)
 	end)
 end

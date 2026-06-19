@@ -21,6 +21,14 @@ Go here → **[DOCUMENTATION.md](DOCUMENTATION.md)** (30-40 min read)
 - API mapping & relationships
 - Tech decisions & trade-offs
 
+### 🎮 I want to understand **Skill & Combat System**
+Read → **[SKILL_SYSTEM_DESIGN.md](SKILL_SYSTEM_DESIGN.md)** (20-30 min read)
+- 3 Classes: Hunter, Warrior, Mage
+- 6-slot skill system (start 2, learn to 6)
+- Real-time action combat design
+- Campfire & skill progression mechanics
+- All 50+ skill definitions & balance parameters
+
 ### 💻 I'm a **Backend Developer**
 Reference → **[API_REFERENCE.md](API_REFERENCE.md)** (20-30 min read)
 - Detailed API documentation
